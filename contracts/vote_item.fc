@@ -2,7 +2,7 @@
 #include "imports/vote/vote_constants.fc";
 #include "imports/vote/vote_utils.fc";
 
-const int const::min_for_storage = 10000000;
+const int const::min_for_storage = 10000000; ;; 0.01
 
 ;; storage
 global slice storage::user_addr;
@@ -14,7 +14,7 @@ global int storage::user_vote;
 
     storage::user_addr = ds~load_msg_addr();
     storage::vote_addr = ds~load_msg_addr();
-    storage::user_vote = ds~load_int(3);
+    storage::user_vote = ds~load_uint(32);
 }
 
 () save_data() impure {
@@ -25,8 +25,8 @@ global int storage::user_vote;
     var body = begin_cell()
             .store_uint(op::change_vote, 32)
             .store_slice(storage::user_addr)
-            .store_int(prev_vote, 3)
-            .store_int(storage::user_vote, 3)
+            .store_uint(prev_vote, 32)
+            .store_uint(storage::user_vote, 32)
         .end_cell();
 
     var msg = begin_cell()
@@ -57,13 +57,9 @@ global int storage::user_vote;
 
     ;; init action
     if (equal_slices(storage::vote_addr, from_addr)) {
-        if (storage::user_vote == const::vote:nothing) {
-            storage::user_vote = in_msg_body~load_int(3);
-            save_data();
-            return ();
-        } else {
-            throw(error::already_voted);
-        }
+        storage::user_vote = in_msg_body~load_uint(32);
+        save_data();
+        return ();
     }
 
     if (msg_value < const::min_for_storage) {
@@ -75,7 +71,7 @@ global int storage::user_vote;
         int op = in_msg_body~load_uint(32);
         if (op == 0) {
             int prev_vote = storage::user_vote;
-            storage::user_vote = parse_yes_or_not_msg(in_msg_body);
+            storage::user_vote = parse_vote_msg(in_msg_body);
             save_data();
 
             if (storage::user_vote != prev_vote) {

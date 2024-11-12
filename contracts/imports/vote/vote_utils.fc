@@ -2,7 +2,7 @@ cell pack_data(slice user_addr, slice main_addr, int vote) inline {
     return begin_cell()
             .store_slice(user_addr)
             .store_slice(main_addr)
-            .store_int(vote, 3)
+            .store_uint(vote, 32)
         .end_cell();
 }
 
@@ -24,22 +24,29 @@ slice calculate_address(cell state_init) inline {
 }
 
 slice calculate_vote_address(slice user_addr, slice main_addr, cell code) inline {
-    cell data = pack_data(user_addr, main_addr, -2);
+    cell data = pack_data(user_addr, main_addr, 0);
     return calculate_address(calculate_state_init(data, code));
 }
 
-const int const::text::yes = 249166704916623; ;; 48 bits
-const int const::text::no = 4036989588; ;; 32 bits
-int parse_yes_or_not_msg(slice msg) inline {
-    int vote = slice_bits(msg) == 48 ? msg~load_uint(48) : msg~load_uint(32);
+int parse_vote_msg(slice msg) inline {
+    ;; Khởi tạo biến lưu trữ kết quả
+    int result = 0;
 
-    if (vote == const::text::yes) {
-        return -1;
-    } elseif (vote == const::text::no) {
-        return 0;
-    } else {
-        return 1; ;; abstain
+    ;; Lặp qua từng ký tự trong chuỗi
+    while (msg.slice_bits() > 0) {
+        ;; Lấy ký tự đầu tiên trong slice dưới dạng mã ASCII
+        int char = msg~load_uint(8);  ;; Mỗi ký tự là 1 byte (8 bit)
+
+        ;; Kiểm tra xem ký tự có phải là số không (từ '0' = 48 đến '9' = 57)
+        if ((char >= 48) & (char <= 57)) {
+            ;; Tính giá trị của chữ số và cộng dồn vào kết quả
+            result = result * 10 + (char - 48);
+        } else {
+            return 0;
+        }
     }
+
+    return result;
 }
 
 () send_text_msg(slice to_addr, int value, int mode, builder content) impure {

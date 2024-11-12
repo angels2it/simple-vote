@@ -34,4 +34,9 @@ export class VoteItem implements Contract {
             body: beginCell().endCell(),
         });
     }
+
+    async getMyVote(provider: ContractProvider) {
+        const result = await provider.get('get_my_vote', []);
+        return [result.stack.readNumber()];
+    }
 }

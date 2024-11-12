@@ -2,15 +2,15 @@
 #include "imports/vote/vote_constants.fc";
 #include "imports/vote/vote_utils.fc";
 
-const int const::min_to_vote = 1000000000; ;; 1 TON
+;; const int const::min_to_vote = 1000000000; ;; 1 TON
+const int const::min_to_vote = 10000000; ;; 0.01 TON
 const int const::min_for_storage = 60000000; ;; 0.06
 const int const::min_for_deploy_vote = 10000000; ;; 0.01
 
 ;; storage variables
-global int storage::votes_yes;
-global int storage::votes_no;
-global int storage::votes_abstain;
+global int storage::votes_count;
 global int storage::time_when_finish;
+global int storage::result;
 global slice storage::initiator_addr;
 global cell storage::vote_code_hex;
 global cell storage::project_name;
@@ -18,27 +18,25 @@ global cell storage::project_name;
 () load_data() impure {
     var ds = get_data().begin_parse();
 
-    storage::votes_yes = ds~load_uint(32);
-    storage::votes_no = ds~load_uint(32);
-    storage::votes_abstain = ds~load_uint(32);
+    storage::votes_count = ds~load_uint(32);
     storage::time_when_finish = ds~load_int(32);
     storage::initiator_addr = ds~load_msg_addr();
     storage::vote_code_hex = ds~load_ref();
     storage::project_name = ds~load_ref();
+    storage::result = ds~load_uint(32);
 
     ds.end_parse();
 }
 
 () save_data() impure {
     set_data(
-            begin_cell()
-                    .store_uint(storage::votes_yes, 32)
-                    .store_uint(storage::votes_no, 32)
-                    .store_uint(storage::votes_abstain, 32)
+        begin_cell()
+                    .store_uint(storage::votes_count, 32)
                     .store_int(storage::time_when_finish, 32)
                     .store_slice(storage::initiator_addr)
                     .store_ref(storage::vote_code_hex)
                     .store_ref(storage::project_name)
+                    .store_uint(storage::result, 32)
                     .end_cell()
     );
 }
@@ -49,11 +47,11 @@ builder store_voted_text(builder b) inline {
 }
 
 () deploy_vote_msg(slice to_address, int vote, int msg_value) impure {
-    cell data = pack_data(to_address, my_address(), -2);
+    cell data = pack_data(to_address, my_address(), 0);
     cell state_init = calculate_state_init(data, storage::vote_code_hex);
     slice to_wallet_address = calculate_address(state_init);
     cell body = begin_cell()
-            .store_int(vote, 3)
+            .store_uint(vote, 32)
             .store_slice(to_address)
             .end_cell();
     var msg = begin_cell()
@@ -69,24 +67,15 @@ builder store_voted_text(builder b) inline {
 }
 
 () decrease_vote(int vote) impure {
-    if (vote == const::vote:yes) {
-        storage::votes_yes -= 1;
-    } elseif (vote == const::vote:no) {
-        storage::votes_no -= 1;
-    } else {
-        storage::votes_abstain -= 1;
+    if(storage::votes_count > 1) {
+        storage::votes_count -= 1;
     }
 }
 
 () increase_vote(int vote) impure {
-    if (vote == const::vote:yes) {
-        storage::votes_yes += 1;
-    } elseif (vote == const::vote:no) {
-        storage::votes_no += 1;
-    } else {
-        storage::votes_abstain += 1;
-    }
+    storage::votes_count += 1;
 }
+
 
 () on_bounce(int msg_value, slice in_msg_body) impure {
     in_msg_body~skip_bits(32);
@@ -122,11 +111,17 @@ builder store_voted_text(builder b) inline {
             send_text_msg(from_addr, commission, 1, begin_cell().store_uint(8390880524967965285, 64));
             return ();
         }
+        if(op == op::set_result) {
+            int result = parse_vote_msg(in_msg_body);
+            storage::result = result;
+            save_data();
+            return ();
+        }
     }
 
     ;; new vote
     if (op == 0) {
-        int vote = parse_yes_or_not_msg(in_msg_body);
+        int vote = parse_vote_msg(in_msg_body);
         increase_vote(vote);
         save_data();
         if (const::min_for_storage > my_balance) {
@@ -136,33 +131,33 @@ builder store_voted_text(builder b) inline {
         return ();
     }
 
-    ;; change vote
-    if (op == op::change_vote) {
-        slice u_addr = in_msg_body~load_msg_addr();
-        slice vote_addr = calculate_vote_address(u_addr, my_address(), storage::vote_code_hex);
-        if (equal_slices(vote_addr, from_addr)) {
-            int prev_vote = in_msg_body~load_int(3);
-            int new_vote = in_msg_body~load_int(3);
-            decrease_vote(prev_vote);
-            increase_vote(new_vote);
-            save_data();
-            return ();
-        }
-        throw(error::invalid_address);
-    }
+    ;; ;; change vote
+    ;; if (op == op::change_vote) {
+    ;;     slice u_addr = in_msg_body~load_msg_addr();
+    ;;     slice vote_addr = calculate_vote_address(u_addr, my_address(), storage::vote_code_hex);
+    ;;     if (equal_slices(vote_addr, from_addr)) {
+    ;;         int prev_vote = in_msg_body~load_int(3);
+    ;;         int new_vote = in_msg_body~load_int(3);
+    ;;         decrease_vote(prev_vote);
+    ;;         increase_vote(new_vote);
+    ;;         save_data();
+    ;;         return ();
+    ;;     }
+    ;;     throw(error::invalid_address);
+    ;; }
 
     throw(error:unknown_op);
 }
 
 ;; get votes
-(int, int) get_votes() method_id {
+(int) get_votes() method_id {
     load_data();
-    return (storage::votes_yes, storage::votes_no);
+    return (storage::votes_count);
 }
 
-(int) is_finished() method_id {
+(int, int) is_finished() method_id {
     load_data();
-    return (storage::time_when_finish > 0) & (storage::time_when_finish > now());
+    return ((storage::result >= 0) & (storage::time_when_finish > 0) & (storage::time_when_finish > now()), storage::result);
 }
 
 (slice) get_vote_addr(slice user_addr) method_id {

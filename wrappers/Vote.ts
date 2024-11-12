@@ -5,11 +5,12 @@ import {
     Contract,
     contractAddress,
     ContractProvider,
+    parseTuple,
     Sender,
     SendMode,
-    toNano
+    toNano,
 } from 'ton-core';
-import { compile } from "@ton-community/blueprint";
+import { compile } from '@ton-community/blueprint';
 
 export const Projects = {
     stonfi: 'STON.fi',
@@ -22,28 +23,26 @@ export const Projects = {
     getgems: 'Getgems',
     tonstarter: 'Tonstarter',
     tonkeeper: 'Tonkeeper',
-    tonhub: 'Tonhub'
-}
+    tonhub: 'Tonhub',
+    BTCPrice: 'Bet BTC Price',
+};
 
 export type VoteConfig = {
-    initiatorAddress: Address
-    yes?: number
-    no?: number
-    abstain?: number
-    timeWhenFinish?: number
-    item_code_hex: Cell
-    project_name: Cell
+    initiatorAddress: Address;
+    count?: number;
+    timeWhenFinish?: number;
+    item_code_hex: Cell;
+    project_name: Cell;
 };
 
 export function voteConfigToCell(config: VoteConfig): Cell {
     return beginCell()
-        .storeUint(config.yes ?? 0, 32)
-        .storeUint(config.no ?? 0, 32)
-        .storeUint(config.abstain ?? 0, 32)
+        .storeUint(config.count ?? 0, 32)
         .storeInt(config.timeWhenFinish ?? 0, 32)
         .storeAddress(config.initiatorAddress)
         .storeRef(config.item_code_hex)
         .storeRef(config.project_name)
+        .storeUint(0, 32)
         .endCell();
 }
 
@@ -68,22 +67,17 @@ export class Vote implements Contract {
         });
     }
 
-    async sendVote(provider: ContractProvider, via: Sender, vote: boolean, value?: bigint) {
+    async sendVote(provider: ContractProvider, via: Sender, vote: number, value?: bigint) {
         return await provider.internal(via, {
             value: value ?? toNano('0.1'),
-            body: beginCell()
-                .storeUint(0, 32)
-                .storeUint(vote ? 249166704916623 : 4036989588, vote ? 48 : 32)
-                .endCell(),
+            body: beginCell().storeUint(0, 32).storeStringTail(vote.toString()).endCell(),
         });
     }
 
     async sendTakeCommissions(provider: ContractProvider, via: Sender, value?: bigint) {
         return await provider.internal(via, {
             value: value ?? toNano('0.1'),
-            body: beginCell()
-                .storeUint(202, 32)
-                .endCell(),
+            body: beginCell().storeUint(202, 32).endCell(),
         });
     }
 
@@ -99,12 +93,19 @@ export class Vote implements Contract {
     }
 
     async getVotes(provider: ContractProvider) {
-        const result = await provider.get('get_votes', [])
-        return [result.stack.readNumber(), result.stack.readNumber()]
+        const result = await provider.get('get_votes', []);
+        return [result.stack.readNumber()];
     }
 
     async getProjectName(provider: ContractProvider) {
-        const result = await provider.get('get_project_name', [])
-        return [result.stack.readString()]
+        const result = await provider.get('get_project_name', []);
+        return [result.stack.readString()];
+    }
+
+    async getMyVoteAddress(provider: ContractProvider, userAddress: Address) {
+        const result = await provider.get('get_vote_addr', [
+            { type: 'slice', cell: beginCell().storeAddress(userAddress).endCell() },
+        ]);
+        return result.stack.readAddress();
     }
 }
