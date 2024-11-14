@@ -16,14 +16,6 @@ export async function run(provider: NetworkProvider) {
 
     const openedContract = provider.open(vote);
 
-    // run methods on `openedContract`
-    const [project] = await openedContract.getProjectName();
-
-    console.log(project);
-
-    // const [votes] = await openedContract.getVotes();
-    // console.log(votes);
-
-    const [myVote, value] = await openedContract.getMyVote(provider.sender().address!);
-    console.log(myVote, value)
+    const [isFinish, result, winnerAddress] = await openedContract.getIsFinish();
+    console.log(isFinish, result, winnerAddress);
 }

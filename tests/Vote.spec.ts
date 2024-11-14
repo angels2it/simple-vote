@@ -1,9 +1,8 @@
 import { Blockchain } from '@ton-community/sandbox';
-import { Address, beginCell, Cell, toNano } from 'ton-core';
-import { Vote } from '../wrappers/Vote';
+import { Address, beginCell, Cell, fromNano, toNano } from 'ton-core';
+import { Projects, Vote } from '../wrappers/Vote';
 import '@ton-community/test-utils';
 import { compile } from '@ton-community/blueprint';
-import { VoteItem } from '../wrappers/VoteItem';
 
 describe('Vote', () => {
     let code: Cell;
@@ -16,17 +15,17 @@ describe('Vote', () => {
         const blockchain = await Blockchain.create();
         blockchain.verbosity = {
             blockchainLogs: false,
-            vmLogs: "none",
+            vmLogs: 'none',
             debugLogs: true,
-        }
+        };
         const initiator = await blockchain.treasury('initiator');
         const user = await blockchain.treasury('user');
+        const user2 = await blockchain.treasury('user2');
         const vote = blockchain.openContract(
             Vote.createFromConfig(
                 {
                     initiatorAddress: initiator.address,
-                    item_code_hex: await compile('VoteItem'),
-                    project_name: beginCell().storeStringTail('Ston.fi').endCell(),
+                    project_name: beginCell().storeStringTail(Projects.BTCPrice).endCell(),
                 },
                 code
             )
@@ -41,16 +40,18 @@ describe('Vote', () => {
             deploy: true,
         });
         const [project] = await vote.getProjectName();
-        console.log(project);
-        const result = await vote.sendVote(user.getSender(), 12);
-        const vote1 = await vote.getVotes();
-        console.log(vote1);
-        const voteAddress = await vote.getMyVoteAddress(user.getSender().address);
-        console.log(voteAddress);
+        console.log(project)
+        await vote.sendVote(user.getSender(), 12);
+        await vote.sendVote(user2.getSender(), 13);
+        const [myVote, value] = await vote.getMyVote(user.address!);
+        console.log(myVote, fromNano(value))
 
-        const voteItem = blockchain.openContract(VoteItem.createFromAddress(voteAddress));
-        const myvote = await voteItem.getMyVote();
-        console.log(myvote);
+        const [myVote2, value2] = await vote.getMyVote(user2.address!);
+        console.log(myVote2, fromNano(value2))
+        console.log('set result')
+        await vote.sendResult(initiator.getSender(), 12);
+        const [isFinish, result, addres] = await vote.getIsFinish();
+        console.log('isFinish', isFinish, result, addres);
     });
 
     // it('bounce test', async () => {

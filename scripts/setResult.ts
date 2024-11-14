@@ -1,4 +1,4 @@
-import { Address, beginCell, toNano } from 'ton-core';
+import { Address, beginCell, fromNano, toNano } from 'ton-core';
 import { Projects, Vote } from '../wrappers/Vote';
 import { compile, NetworkProvider } from '@ton-community/blueprint';
 
@@ -11,7 +11,7 @@ export async function run(provider: NetworkProvider) {
     const openedContract = provider.open(vote);
 
     // run methods on `openedContract`
-    const result = await openedContract.sendVote(provider.sender(), 22, toNano('0.1'))
+    const result = await openedContract.sendResult(provider.sender(), 22)
 
     console.log(result)
 }

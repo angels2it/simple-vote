@@ -11,7 +11,7 @@ export async function run(provider: NetworkProvider) {
     const openedContract = provider.open(vote);
 
     // run methods on `openedContract`
-    const result = await openedContract.sendVote(provider.sender(), 22, toNano('0.1'))
+    const result = await openedContract.sendClaim(provider.sender())
 
     console.log(result)
 }

@@ -1,9 +1,12 @@
 const int const::vote:nothing = 0;
 
+const int op::vote = 0;
 const int op::change_vote = 201;
 const int op::take_commission = 202;
 const int op::set_result = 203;
 const int op::end_vote = 204;
+const int op::claim = 205;
+const int op::check_result = 206;
 
 const int error:unknown_op = 100;
 const int error::voting_finished = 101;
@@ -11,3 +14,4 @@ const int error::already_voted = 102;
 const int error::invalid_vote = 103;
 const int error::invalid_address = 104;
 const int error::not_enough_funds = 105;
+const int error::looser = 106;

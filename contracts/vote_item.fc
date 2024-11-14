@@ -54,12 +54,15 @@ global int storage::user_vote;
 
     load_data();
     slice from_addr = cs~load_msg_addr();
-
+    int op = in_msg_body~load_uint(32);
+    ~dump(op);
     ;; init action
     if (equal_slices(storage::vote_addr, from_addr)) {
-        storage::user_vote = in_msg_body~load_uint(32);
-        save_data();
-        return ();
+        if(op == op::vote) {
+            storage::user_vote = in_msg_body~load_uint(32);
+            save_data();
+            return ();
+        }
     }
 
     if (msg_value < const::min_for_storage) {
@@ -68,8 +71,7 @@ global int storage::user_vote;
 
     ;; actiion for change vote from User
     if (equal_slices(storage::user_addr, from_addr)) {
-        int op = in_msg_body~load_uint(32);
-        if (op == 0) {
+        if (op == op::vote) {
             int prev_vote = storage::user_vote;
             storage::user_vote = parse_vote_msg(in_msg_body);
             save_data();
@@ -83,6 +85,24 @@ global int storage::user_vote;
             }
 
             return ();
+        }
+        if(op == op::check_result) {
+            ~strdump("CHECK_RESULT");
+            cell body = begin_cell()
+            .store_uint(op::check_result, 32)
+            .store_uint(storage::user_vote, 32)
+            .store_slice(storage::user_addr)
+            .end_cell();
+            var msg = begin_cell()
+                .store_uint(0x18, 6)
+                .store_slice(storage::vote_addr)
+                .store_coins(const::min_for_storage)
+                .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+                .store_ref(body)
+            ;
+
+            send_raw_message(msg.end_cell(), 1);
+            return();
         }
     }
 

@@ -1,0 +1,5 @@
+npx blueprint run deployVote --testnet --mnemonic
+
+npx blueprint run makeVote --testnet --tonconnect
+
+npx blueprint run setResult --testnet --mnemonic
